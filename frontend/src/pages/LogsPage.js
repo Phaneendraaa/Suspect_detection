@@ -157,13 +157,14 @@ const LogsPage = () => {
                     Risk Score <ArrowUpDown size={14} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">Alert</th>
+                <th className="px-4 py-3 text-left">ML Score</th>
+                <th className="px-4 py-3 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredActivities.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan="8" className="px-4 py-8 text-center text-slate-500">
                     No activity logs found
                   </td>
                 </tr>
@@ -213,12 +214,25 @@ const LogsPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {activity.alertTriggered ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                          YES
+                      {activity.mlAnomalyScore > 0 ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                          {activity.mlAnomalyScore}
                         </span>
                       ) : (
                         <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {activity.status === 'blocked' || activity.wasBlocked ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                          🚫 BLOCKED
+                        </span>
+                      ) : activity.alertTriggered ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                          ⚠️ ALERT
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Normal</span>
                       )}
                     </td>
                   </tr>

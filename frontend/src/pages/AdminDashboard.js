@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AlertCircle, CheckCircle, XCircle, Bell, TrendingUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Bell, TrendingUp, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import io from 'socket.io-client';
 
@@ -113,8 +113,8 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Stats Cards - Now 5 cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+      {/* Stats Cards - Now 6 cards */}
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
         <div className="bg-white border border-slate-200 rounded-lg p-6" data-testid="total-logins-card">
           <div className="flex items-start justify-between">
             <div>
@@ -174,7 +174,44 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-white border border-red-100 rounded-lg p-6" data-testid="ml-blocked-card">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-slate-500 mb-1">ML Blocked</p>
+              <p className="text-3xl font-semibold text-red-600">{stats?.mlBlockedCount || 0}</p>
+              <p className="text-xs text-slate-400 mt-1">Auto-blocked by ML</p>
+            </div>
+            <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center">
+              <Shield className="text-red-700" size={20} />
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Active Blocks Info */}
+      {stats?.activeBlocks && (stats.activeBlocks.users > 0 || stats.activeBlocks.ips > 0 || stats.activeBlocks.devices > 0) && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4" data-testid="active-blocks">
+          <h3 className="font-medium text-red-900 mb-2 flex items-center gap-2">
+            <Shield size={18} />
+            Active Blocks (10-min duration)
+          </h3>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-red-600 font-semibold">{stats.activeBlocks.users}</span>
+              <span className="text-slate-600"> User Accounts</span>
+            </div>
+            <div>
+              <span className="text-red-600 font-semibold">{stats.activeBlocks.ips}</span>
+              <span className="text-slate-600"> IP Addresses</span>
+            </div>
+            <div>
+              <span className="text-red-600 font-semibold">{stats.activeBlocks.devices}</span>
+              <span className="text-slate-600"> Devices</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -241,9 +278,15 @@ const AdminDashboard = () => {
                   <div>
                     <p className="font-medium text-slate-900">{activity.email}</p>
                     <p className="text-sm text-slate-500">{activity.reason}</p>
+                    {activity.mlAnomalyScore > 0 && (
+                      <p className="text-xs text-purple-600 mt-1">ML Score: {activity.mlAnomalyScore}</p>
+                    )}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-mono font-semibold text-red-600">Score: {activity.riskScore}</p>
+                    <p className="text-sm font-mono font-semibold text-red-600">Risk: {activity.riskScore}</p>
+                    {activity.wasBlocked && (
+                      <p className="text-xs text-red-700 font-semibold mt-1">🚫 BLOCKED</p>
+                    )}
                     <p className="text-xs text-slate-500">{new Date(activity.timestamp).toLocaleString()}</p>
                   </div>
                 </div>
