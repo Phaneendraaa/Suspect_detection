@@ -114,7 +114,7 @@ const LoginPage = () => {
                 <p className="text-xs text-slate-500 mb-2">Test Accounts:</p>
                 <div className="space-y-1 text-xs font-mono text-slate-600">
                   <div>USER: user@test.com / password123</div>
-                  <div>ADMIN: admin@test.com / admin123</div>
+                  <div>ADMIN: nagaphaneendrapuranam@gmail.com / admin123</div>
                 </div>
               </div>
             )}

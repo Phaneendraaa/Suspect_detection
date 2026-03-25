@@ -19,6 +19,8 @@ const PORT = 8001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const ADMIN_EMAIL = 'nagaphaneendrapuranam@gmail.com';
 const BLOCK_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
+const MAX_ATTEMPTS_2MIN = 5; // Max attempts allowed in 2 minutes
+const TWO_MINUTES = 2 * 60 * 1000; // 2 minutes in milliseconds
 
 // Middleware
 app.use(cors({ origin: '*', credentials: true }));
@@ -334,6 +336,26 @@ function calculateAdvancedRiskScore(email, userId, status, deviceFingerprint, ha
   return Math.min(score, 100);
 }
 
+// Check 5 attempts in 2 minutes rule
+function check5AttemptsIn2Minutes(email) {
+  const now = Date.now();
+  
+  if (!loginAttempts.has(email)) {
+    loginAttempts.set(email, []);
+  }
+  
+  const attempts = loginAttempts.get(email);
+  // Clean attempts older than 2 minutes
+  const recentAttempts = attempts.filter(time => now - time < TWO_MINUTES);
+  loginAttempts.set(email, recentAttempts);
+  
+  // Add current attempt
+  recentAttempts.push(now);
+  
+  // Check if 5 or more attempts in 2 minutes
+  return recentAttempts.length >= MAX_ATTEMPTS_2MIN;
+}
+
 function analyzeFrequency(email) {
   const now = Date.now();
   const fiveMinutes = 5 * 60 * 1000;
@@ -403,40 +425,52 @@ function analyzeFailurePattern(email) {
   return 0;
 }
 
-// Send Email Alert
-async function sendSecurityAlert(userEmail, ipAddress, riskScore, mlScore, reason, timestamp, wasBlocked) {
+// Send Email Alert - Updated to send for medium and high risk
+async function sendSecurityAlert(userEmail, ipAddress, riskScore, mlScore, reason, timestamp, wasBlocked, riskLevel = 'HIGH') {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
     console.log('⚠️ Email not configured');
     return false;
   }
 
-  const blockStatus = wasBlocked ? '<p style="color: #dc2626; font-weight: bold;">⚠️ ACCOUNT HAS BEEN BLOCKED FOR 10 MINUTES</p>' : '';
+  const colors = {
+    HIGH: { bg: '#dc2626', text: '#991b1b', border: '#ef4444' },
+    MEDIUM: { bg: '#f59e0b', text: '#92400e', border: '#fbbf24' }
+  };
+  
+  const color = colors[riskLevel] || colors.HIGH;
+  const blockStatus = wasBlocked ? '<p style="color: #dc2626; font-weight: bold;">⛔ ACCOUNT HAS BEEN BLOCKED FOR 10 MINUTES</p>' : '';
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: ADMIN_EMAIL,
-    subject: `🚨 ${wasBlocked ? 'CRITICAL' : 'Security'} Alert: ${wasBlocked ? 'Account Blocked' : 'High Risk Login'} (Score: ${riskScore})`,
+    subject: `🚨 ${wasBlocked ? 'CRITICAL' : riskLevel + ' RISK'} Alert: ${wasBlocked ? 'Account Blocked' : 'Suspicious Activity'} (Score: ${riskScore})`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: ${wasBlocked ? '#dc2626' : '#ef4444'}; color: white; padding: 20px; text-align: center;">
-          <h1 style="margin: 0;">⚠️ Security Alert</h1>
-          <p style="margin: 5px 0 0 0;">${wasBlocked ? 'ACCOUNT BLOCKED - High Risk Activity' : 'High Risk Activity Detected'}</p>
+        <div style="background-color: ${color.bg}; color: white; padding: 20px; text-align: center;">
+          <h1 style="margin: 0;">⚠️ ${riskLevel} RISK Security Alert</h1>
+          <p style="margin: 5px 0 0 0;">${wasBlocked ? 'ACCOUNT BLOCKED - Suspicious Activity' : 'Suspicious Activity Detected'}</p>
         </div>
         <div style="padding: 20px; border: 1px solid #e5e7eb;">
           ${blockStatus}
           <h2 style="color: #1f2937; margin-top: 0;">Alert Details</h2>
           <table style="width: 100%; border-collapse: collapse;">
-            <tr><td style="padding: 10px 0; font-weight: bold;">User Email:</td><td>${userEmail}</td></tr>
-            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">IP Address:</td><td><code>${ipAddress}</code></td></tr>
-            <tr><td style="padding: 10px 0; font-weight: bold;">Timestamp:</td><td>${timestamp.toLocaleString()}</td></tr>
-            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">Risk Score:</td><td><span style="background-color: #ef4444; color: white; padding: 5px 10px; border-radius: 3px;">${riskScore}/100</span></td></tr>
-            <tr><td style="padding: 10px 0; font-weight: bold;">ML Anomaly Score:</td><td><span style="background-color: #f59e0b; color: white; padding: 5px 10px; border-radius: 3px;">${mlScore}/100</span></td></tr>
-            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">Reason:</td><td>${reason}</td></tr>
-            ${wasBlocked ? '<tr><td style="padding: 10px 0; font-weight: bold;">Block Duration:</td><td>10 minutes</td></tr>' : ''}
+            <tr><td style="padding: 10px 0; font-weight: bold;">Risk Level:</td><td><span style="background-color: ${color.bg}; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;">${riskLevel} RISK</span></td></tr>
+            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">User Email:</td><td>${userEmail}</td></tr>
+            <tr><td style="padding: 10px 0; font-weight: bold;">IP Address:</td><td><code>${ipAddress}</code></td></tr>
+            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">Timestamp:</td><td>${timestamp.toLocaleString()}</td></tr>
+            <tr><td style="padding: 10px 0; font-weight: bold;">Risk Score:</td><td><span style="background-color: ${color.border}; color: white; padding: 5px 10px; border-radius: 3px;">${riskScore}/100</span></td></tr>
+            <tr style="background-color: #f9fafb;"><td style="padding: 10px 0; font-weight: bold;">ML Anomaly Score:</td><td><span style="background-color: #8b5cf6; color: white; padding: 5px 10px; border-radius: 3px;">${mlScore}/100</span></td></tr>
+            <tr><td style="padding: 10px 0; font-weight: bold;">Reason:</td><td>${reason}</td></tr>
+            ${wasBlocked ? '<tr style="background-color: #fef2f2;"><td style="padding: 10px 0; font-weight: bold;">Block Duration:</td><td><strong>10 minutes</strong></td></tr>' : ''}
           </table>
-          <div style="margin-top: 20px; padding: 15px; background-color: #fef2f2; border-left: 4px solid #ef4444;">
-            <p style="margin: 0; color: #991b1b;"><strong>ML Detection:</strong> Machine learning algorithms detected anomalous behavior patterns.</p>
+          <div style="margin-top: 20px; padding: 15px; background-color: ${riskLevel === 'HIGH' ? '#fef2f2' : '#fef3c7'}; border-left: 4px solid ${color.border};">
+            <p style="margin: 0; color: ${color.text};"><strong>Action Required:</strong> ${wasBlocked ? 'Account has been automatically blocked. Review immediately.' : 'Please review this activity in your security dashboard.'}</p>
           </div>
+          ${riskLevel === 'MEDIUM' ? '<div style="margin-top: 15px; padding: 15px; background-color: #eff6ff; border-left: 4px solid #3b82f6;"><p style="margin: 0; color: #1e40af;"><strong>Note:</strong> This is a medium risk alert. Monitor for escalation.</p></div>' : ''}
+        </div>
+        <div style="padding: 15px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb;">
+          <p>This is an automated security alert from Smart Security Monitoring System.</p>
+          <p>Admin: nagaphaneendrapuranam@gmail.com</p>
         </div>
       </div>
     `
@@ -444,7 +478,7 @@ async function sendSecurityAlert(userEmail, ipAddress, riskScore, mlScore, reaso
 
   try {
     await emailTransporter.sendMail(mailOptions);
-    console.log(`✅ Security alert email sent to ${ADMIN_EMAIL}`);
+    console.log(`✅ ${riskLevel} RISK alert email sent to ${ADMIN_EMAIL}`);
     return true;
   } catch (error) {
     console.error('❌ Failed to send email:', error);
@@ -553,6 +587,37 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email: sanitizedEmail });
     const userId = user?._id.toString();
 
+    // NEW: Check 5 attempts in 2 minutes - IMMEDIATE BLOCK
+    const shouldBlockFor5Attempts = check5AttemptsIn2Minutes(sanitizedEmail);
+    if (shouldBlockFor5Attempts && userId) {
+      await blockUser(userId, '5 login attempts within 2 minutes - Auto-blocked');
+      await blockIP(ipAddress, '5 attempts in 2 minutes');
+      await blockDevice(deviceInfo.fingerprint, '5 attempts in 2 minutes');
+      
+      await Activity.create({
+        userId,
+        email: sanitizedEmail,
+        status: 'blocked',
+        location: ipAddress,
+        riskScore: 100,
+        mlAnomalyScore: 0,
+        reason: '5 login attempts in 2 minutes - Auto-blocked',
+        deviceInfo,
+        ipAddress,
+        alertTriggered: true,
+        wasBlocked: true
+      });
+
+      sendSecurityAlert(sanitizedEmail, ipAddress, 100, 0, '5 login attempts within 2 minutes - Auto-blocked', timestamp, true, 'HIGH');
+      io.emit('security-alert', { email: sanitizedEmail, riskScore: 100, blocked: true, reason: '5 attempts in 2 min' });
+      
+      return res.status(403).json({ 
+        error: 'Account blocked: 5 login attempts within 2 minutes',
+        blockedFor: '10 minutes',
+        reason: 'Too many rapid attempts detected'
+      });
+    }
+
     // Check if blocked
     const blockCheck = await checkIfBlocked(userId, ipAddress, deviceInfo.fingerprint);
     if (blockCheck.blocked) {
@@ -593,8 +658,12 @@ app.post('/api/auth/login', async (req, res) => {
       if (riskScore >= 70) {
         await blockIP(ipAddress, 'Multiple failed login attempts');
         await blockDevice(deviceInfo.fingerprint, 'Multiple failed login attempts');
-        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, 0, 'Failed login - User not found', timestamp, true);
+        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, 0, 'Failed login - User not found', timestamp, true, 'HIGH');
         io.emit('security-alert', { email: sanitizedEmail, riskScore, blocked: true });
+      } else if (riskScore >= 50) {
+        // Medium risk - send alert but don't block
+        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, 0, 'Medium risk - Failed login attempt', timestamp, false, 'MEDIUM');
+        io.emit('security-alert', { email: sanitizedEmail, riskScore, blocked: false });
       }
       
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -623,8 +692,12 @@ app.post('/api/auth/login', async (req, res) => {
         await blockIP(ipAddress, 'Multiple failed password attempts');
         await blockDevice(deviceInfo.fingerprint, 'Multiple failed password attempts');
         
-        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'Multiple failed password attempts', timestamp, true);
+        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'Multiple failed password attempts', timestamp, true, 'HIGH');
         io.emit('security-alert', { email: sanitizedEmail, riskScore, mlScore, blocked: true });
+      } else if (riskScore >= 50) {
+        // Medium risk - send alert but don't block
+        sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'Medium risk - Failed password attempts', timestamp, false, 'MEDIUM');
+        io.emit('security-alert', { email: sanitizedEmail, riskScore, mlScore, blocked: false });
       }
       
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -635,7 +708,7 @@ app.post('/api/auth/login', async (req, res) => {
     const riskScore = calculateAdvancedRiskScore(sanitizedEmail, userId, 'success', deviceInfo.fingerprint, hadRecentFailures, mlScore);
     
     const shouldBlock = riskScore >= 80 || mlScore >= 70;
-    const alertTriggered = riskScore >= 70;
+    const alertTriggered = riskScore >= 50; // Send alert for medium risk (50+) and high risk (70+)
     
     if (shouldBlock) {
       await blockUser(userId, 'Suspicious login pattern detected by ML');
@@ -656,7 +729,7 @@ app.post('/api/auth/login', async (req, res) => {
         wasBlocked: true
       });
 
-      sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'ML detected anomaly - Account blocked', timestamp, true);
+      sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'ML detected anomaly - Account blocked', timestamp, true, 'HIGH');
       io.emit('security-alert', { email: sanitizedEmail, riskScore, mlScore, blocked: true });
       
       return res.status(403).json({ 
@@ -681,7 +754,8 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
     if (alertTriggered) {
-      sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'High risk login detected', timestamp, false);
+      const riskLevel = riskScore >= 70 ? 'HIGH' : 'MEDIUM';
+      sendSecurityAlert(sanitizedEmail, ipAddress, riskScore, mlScore, 'High risk login detected', timestamp, false, riskLevel);
       io.emit('security-alert', { email: sanitizedEmail, riskScore, mlScore, blocked: false });
     }
 
