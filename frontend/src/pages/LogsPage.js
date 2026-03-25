@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -22,7 +22,9 @@ const LogsPage = () => {
     let filtered = activities.filter((activity) =>
       activity.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.status?.toLowerCase().includes(searchTerm.toLowerCase())
+      activity.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.deviceInfo?.browser?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.deviceInfo?.os?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Sort
@@ -102,7 +104,7 @@ const LogsPage = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search by email, location, or status..."
+            placeholder="Search by email, location, device..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             data-testid="search-input"
@@ -135,7 +137,8 @@ const LogsPage = () => {
                     Status <ArrowUpDown size={14} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">Location</th>
+                <th className="px-4 py-3 text-left">Device Info</th>
+                <th className="px-4 py-3 text-left">IP Address</th>
                 <th className="px-4 py-3 text-left">
                   <button
                     onClick={() => handleSort('timestamp')}
@@ -154,12 +157,13 @@ const LogsPage = () => {
                     Risk Score <ArrowUpDown size={14} />
                   </button>
                 </th>
+                <th className="px-4 py-3 text-left">Alert</th>
               </tr>
             </thead>
             <tbody>
               {filteredActivities.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
                     No activity logs found
                   </td>
                 </tr>
@@ -180,7 +184,22 @@ const LogsPage = () => {
                         {activity.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{activity.location}</td>
+                    <td className="px-4 py-3">
+                      {activity.deviceInfo ? (
+                        <div className="text-xs text-slate-600">
+                          <div className="flex items-center gap-1">
+                            <Monitor size={12} />
+                            <span>{activity.deviceInfo.browser || 'Unknown'}</span>
+                          </div>
+                          <div className="text-slate-400">
+                            {activity.deviceInfo.os || 'Unknown'} • {activity.deviceInfo.device || 'Desktop'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-mono text-slate-600">{activity.ipAddress || activity.location}</td>
                     <td className="px-4 py-3 text-sm font-mono text-slate-600">
                       {new Date(activity.timestamp).toLocaleString()}
                     </td>
@@ -192,6 +211,15 @@ const LogsPage = () => {
                       >
                         {activity.riskScore}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {activity.alertTriggered ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
                     </td>
                   </tr>
                 ))

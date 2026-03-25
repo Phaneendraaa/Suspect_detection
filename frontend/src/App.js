@@ -31,16 +31,15 @@ function App() {
 
           {/* Admin Routes */}
           <Route
-            path="/"
             element={
               <PrivateRoute allowedRoles={['ADMIN']}>
                 <AdminLayout />
               </PrivateRoute>
             }
           >
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="logs" element={<LogsPage />} />
-            <Route path="users" element={<UsersPage />} />
+            <Route path="/dashboard" element={<AdminDashboard />} />
+            <Route path="/logs" element={<LogsPage />} />
+            <Route path="/users" element={<UsersPage />} />
           </Route>
 
           {/* Default redirect */}

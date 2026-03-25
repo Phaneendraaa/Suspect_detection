@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Bell, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import io from 'socket.io-client';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -11,9 +12,39 @@ const AdminDashboard = () => {
   const { token } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [realtimeAlerts, setRealtimeAlerts] = useState([]);
 
   useEffect(() => {
     fetchStats();
+    
+    // Setup Socket.IO for real-time alerts
+    const socket = io(BACKEND_URL, {
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+      console.log('Connected to real-time alerts');
+    });
+
+    socket.on('security-alert', (alert) => {
+      console.log('Security alert received:', alert);
+      
+      // Show toast notification
+      toast.error(
+        `Security Alert: ${alert.email} - Risk Score: ${alert.riskScore}`,
+        { duration: 5000 }
+      );
+      
+      // Add to realtime alerts list
+      setRealtimeAlerts(prev => [alert, ...prev].slice(0, 5));
+      
+      // Refresh stats
+      fetchStats();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const fetchStats = async () => {
@@ -64,8 +95,26 @@ const AdminDashboard = () => {
         <p className="text-slate-500 mt-2">Security monitoring overview and analytics</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Real-time Alerts Banner */}
+      {realtimeAlerts.length > 0 && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4" data-testid="realtime-alerts">
+          <div className="flex items-center gap-2 mb-2">
+            <Bell className="text-red-600" size={20} />
+            <h3 className="font-medium text-red-900">Recent Security Alerts</h3>
+          </div>
+          <div className="space-y-2">
+            {realtimeAlerts.map((alert, idx) => (
+              <div key={idx} className="text-sm text-red-700 flex justify-between items-center">
+                <span>{alert.email} - {alert.reason}</span>
+                <span className="font-mono font-semibold">Risk: {alert.riskScore}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards - Now 5 cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
         <div className="bg-white border border-slate-200 rounded-lg p-6" data-testid="total-logins-card">
           <div className="flex items-start justify-between">
             <div>
@@ -101,10 +150,34 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-6" data-testid="alerts-triggered-card">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-slate-500 mb-1">Alerts Triggered</p>
+              <p className="text-3xl font-semibold text-slate-900">{stats?.alertsTriggered || 0}</p>
+            </div>
+            <div className="w-10 h-10 bg-red-50 rounded-md flex items-center justify-center">
+              <Bell className="text-red-600" size={20} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-6" data-testid="suspicious-activity-card">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-slate-500 mb-1">Suspicious Activity</p>
+              <p className="text-3xl font-semibold text-slate-900">{stats?.suspiciousActivityCount || 0}</p>
+            </div>
+            <div className="w-10 h-10 bg-amber-50 rounded-md flex items-center justify-center">
+              <TrendingUp className="text-amber-600" size={20} />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Line Chart */}
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-testid="activity-chart">
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -120,6 +193,7 @@ const AdminDashboard = () => {
                 <Legend wrapperStyle={{ fontSize: '14px' }} />
                 <Line type="monotone" dataKey="success" stroke="#10B981" strokeWidth={2} name="Success" />
                 <Line type="monotone" dataKey="failed" stroke="#EF4444" strokeWidth={2} name="Failed" />
+                <Line type="monotone" dataKey="highRisk" stroke="#F59E0B" strokeWidth={2} name="High Risk" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -153,6 +227,31 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Recent High-Risk Activities */}
+      {stats?.recentHighRisk && stats.recentHighRisk.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-testid="recent-high-risk">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+            <h3 className="text-lg font-medium text-slate-900">Recent High-Risk Activities</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-3">
+              {stats.recentHighRisk.map((activity, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3 bg-red-50 border border-red-100 rounded-md">
+                  <div>
+                    <p className="font-medium text-slate-900">{activity.email}</p>
+                    <p className="text-sm text-slate-500">{activity.reason}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono font-semibold text-red-600">Score: {activity.riskScore}</p>
+                    <p className="text-xs text-slate-500">{new Date(activity.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
