@@ -17,7 +17,7 @@ const io = new Server(server, {
 
 const PORT = 8001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_EMAIL = 'nagaphaneendrapuranam@gmail.com';
+const ADMIN_EMAIL = 'tharunreddy19938@gmail.com';
 const BLOCK_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
 const MAX_ATTEMPTS_2MIN = 5; // Max attempts allowed in 2 minutes
 const TWO_MINUTES = 2 * 60 * 1000; // 2 minutes in milliseconds
