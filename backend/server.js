@@ -30,7 +30,7 @@ app.use(express.json());
 const MONGO_URL = process.env.MONGO_URL;
 const DB_NAME = process.env.DB_NAME || 'security_monitoring_db';
 
-mongoose.connect(MONGO_URL)
+mongoose.connect("mongodb://tharunreddy1993:tharun123@ac-pul0dwd-shard-00-00.lzwmxaw.mongodb.net:27017,ac-pul0dwd-shard-00-01.lzwmxaw.mongodb.net:27017,ac-pul0dwd-shard-00-02.lzwmxaw.mongodb.net:27017/?ssl=true&replicaSet=atlas-4yy5f6-shard-0&authSource=admin&appName=Sec")
   .then(() => {
     console.log('✅ Connected to MongoDB Atlas Cluster');
     initializeDefaultUsers();
@@ -41,8 +41,8 @@ mongoose.connect(MONGO_URL)
 const emailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
+    user: 'nagaworkk@gmail.com',
+    pass: 'afojsgcvxgcpfboz'
   }
 });
 

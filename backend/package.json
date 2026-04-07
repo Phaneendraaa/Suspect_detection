@@ -1,8 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "license": "MIT",
+  "scripts": {
+    "dev": "nodemon server.js"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
@@ -12,6 +15,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.2",
     "nodemailer": "^8.0.4",
+    "nodemon": "^3.1.14",
     "socket.io": "^4.8.3",
     "ua-parser-js": "^2.0.9"
   }
